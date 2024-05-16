@@ -1,0 +1,43 @@
+const express = require('express');
+const youtubedl = require('youtube-dl-exec');
+const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const port = 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.post('/download', async (req, res) => {
+    const { url, format } = req.body;
+
+    if (!url || !format) {
+        return res.status(400).send('Missing parameters');
+    }
+
+    try {
+        const outputDir = path.resolve(__dirname, 'downloads');
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir);
+        }
+
+        const result = await youtubedl(url, {
+            format: format === 'mp4' ? 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4' : 'bestaudio[ext=mp3]',
+            output: path.join(outputDir, '%(title)s.%(ext)s'),
+        });
+
+        const filePath = result._filename;
+        res.json({ success: true, downloadUrl: `http://localhost:${port}/files/${path.basename(filePath)}` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Failed to process video');
+    }
+});
+
+app.use('/files', express.static(path.resolve(__dirname, 'downloads')));
+
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+});
